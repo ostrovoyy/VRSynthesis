@@ -308,29 +308,44 @@ function CreateTexture() {
 }
 
 function createSphereSurface(r) {
-  let vertexList = [];
+  const vertexList = [];
+  const STEP = 0.2;
+
   let lon = -Math.PI;
   let lat = -Math.PI * 0.5;
-  const STEP = 0.2;
+
   while (lon < Math.PI) {
-      while (lat < Math.PI * 0.5) {
-          let v1 = sphere(r, lon, lat);
-          let v2 = sphere(r, lon + STEP, lat);
-          let v3 = sphere(r, lon, lat + STEP);
-          let v4 = sphere(r, lon + STEP, lat + STEP);
-          vertexList.push(v1.x, v1.y, v1.z);
-          vertexList.push(v2.x, v2.y, v2.z);
-          vertexList.push(v3.x, v3.y, v3.z);
-          vertexList.push(v3.x, v3.y, v3.z);
-          vertexList.push(v4.x, v4.y, v4.z);
-          vertexList.push(v2.x, v2.y, v2.z);
-          lat += STEP;
-      }
-      lat = -Math.PI * 0.5
-      lon += STEP;
+    processLatitude(lon, lat, r, STEP, vertexList);
+    lon += STEP;
   }
+
   return vertexList;
 }
+
+function processLatitude(lon, lat, r, STEP, vertexList) {
+  while (lat < Math.PI * 0.5) {
+    const v1 = sphere(r, lon, lat);
+    const v2 = sphere(r, lon + STEP, lat);
+    const v3 = sphere(r, lon, lat + STEP);
+    const v4 = sphere(r, lon + STEP, lat + STEP);
+
+    addVerticesToVertexList(v1, v2, v3, v4, vertexList);
+
+    lat += STEP;
+  }
+}
+
+function addVerticesToVertexList(v1, v2, v3, v4, vertexList) {
+  vertexList.push(
+    v1.x, v1.y, v1.z,
+    v2.x, v2.y, v2.z,
+    v3.x, v3.y, v3.z,
+    v3.x, v3.y, v3.z,
+    v4.x, v4.y, v4.z,
+    v2.x, v2.y, v2.z
+  );
+}
+
 
 function sphere(r, u, v) {
   let x = r * Math.sin(u) * Math.cos(v);
@@ -441,24 +456,34 @@ let track = null;
 let panner;
 function audioPlay() {
   const track = document.getElementById('audioElement');
-  const checkBox = document.getElementById('filter');
-  track.addEventListener('play', function() {
-    if (!audio) {
-      audio = new (window.AudioContext || window.webkitAudioContext)();
-      source = audio.createMediaElementSource(track);
-      panner = audio.createPanner();
-      filter = audio.createBiquadFilter();
+  track.addEventListener('play', initializeAudio);
+}
 
-      source.connect(panner);
-      panner.connect(filter);
-      filter.connect(audio.destination);
+function initializeAudio() {
+  const track = document.getElementById('audioElement');
+  if (!audio) {
+    audio = new (window.AudioContext || window.webkitAudioContext)();
+    source = audio.createMediaElementSource(track);
+    panner = audio.createPanner();
+    filter = audio.createBiquadFilter();
 
-      filter.type = 'highpass';
-      filter.frequency.value = 4000;
-      audio.resume();
+    connectAudioNodes();
 
-    }
-  });
+    configureFilter();
+
+    audio.resume();
+  }
+}
+
+function connectAudioNodes() {
+  source.connect(panner);
+  panner.connect(filter);
+  filter.connect(audio.destination);
+}
+
+function configureFilter() {
+  filter.type = 'highpass';
+  filter.frequency.value = 4000;
 }
 
 function enableAudio() {
@@ -485,38 +510,27 @@ function enableAudio() {
 let alpha, beta, gamma;
 
 function getPos(alpha, beta, gamma) {
-    const alphaRad = alpha;
-    const betaRad = beta;
-    const gammaRad = gamma;
+  const alphaRad = alpha;
+  const betaRad = beta;
+  const gammaRad = gamma;
 
-    // Define the initial vector along the x-axis
-    let vector = [0, 2, 0];
+  let vector = [0, 2, 0];
 
-    // Rotation around the z-axis (gamma)
-    const rotZ = [
-        [Math.cos(gammaRad), -Math.sin(gammaRad), 0],
-        [Math.sin(gammaRad), Math.cos(gammaRad), 0],
-        [0, 0, 1]
-    ];
-    vector = multiplyMatrixVector(rotZ, vector);
+  vector = rotateAroundZ(gammaRad, vector);
+  vector = rotateAroundY(betaRad, vector);
+  vector = rotateAroundX(alphaRad, vector);
 
-    // Rotation around the y-axis (beta)
-    const rotY = [
-        [Math.cos(betaRad), 0, Math.sin(betaRad)],
-        [0, 1, 0],
-        [-Math.sin(betaRad), 0, Math.cos(betaRad)]
-    ];
-    vector = multiplyMatrixVector(rotY, vector);
+  return vector;
+}
 
-    // Rotation around the x-axis (alpha)
-    const rotX = [
-        [1, 0, 0],
-        [0, Math.cos(alphaRad), -Math.sin(alphaRad)],
-        [0, Math.sin(alphaRad), Math.cos(alphaRad)]
-    ];
-    vector = multiplyMatrixVector(rotX, vector);
-
-    return vector;
+function multiplyMatrixVector(matrix, vector) {
+  const result = [0, 0, 0];
+  for (let i = 0; i < 3; i++) {
+      for (let j = 0; j < 3; j++) {
+          result[i] += matrix[i][j] * vector[j];
+      }
+  }
+  return result;
 }
 
 function multiplyMatrixVector(matrix, vector) {
@@ -613,6 +627,34 @@ function CreateWebCamTexture() {
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 }
+
+function rotateAroundZ(angle, vector) {
+  const rotZ = [
+      [Math.cos(angle), -Math.sin(angle), 0],
+      [Math.sin(angle), Math.cos(angle), 0],
+      [0, 0, 1]
+  ];
+  return multiplyMatrixVector(rotZ, vector);
+}
+
+function rotateAroundY(angle, vector) {
+  const rotY = [
+      [Math.cos(angle), 0, Math.sin(angle)],
+      [0, 1, 0],
+      [-Math.sin(angle), 0, Math.cos(angle)]
+  ];
+  return multiplyMatrixVector(rotY, vector);
+}
+
+function rotateAroundX(angle, vector) {
+  const rotX = [
+      [1, 0, 0],
+      [0, Math.cos(angle), -Math.sin(angle)],
+      [0, Math.sin(angle), Math.cos(angle)]
+  ];
+  return multiplyMatrixVector(rotX, vector);
+}
+
 
 function getRotationMatrix() {
   const _x = -beta;
