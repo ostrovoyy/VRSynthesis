@@ -81,10 +81,6 @@ function ShaderProgram(name, program) {
 }
 
 
-/* Draws a colored cube, along with a set of coordinate axes.
- * (Note that the use of the above drawPrimitive function is not an efficient
- * way to draw with WebGL.  Here, the geometry is so simple that it doesn't matter.)
- */
 let conv, // convergence
     eyes, // eye separation
     ratio, // aspect ratio
@@ -97,19 +93,17 @@ function draw() {
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
     calcCamParameters();
-    
-    applyLeftFrustrum();
 
-    let projectionLeft = m4.frustum(left, right, bottom, top1, near, far);
-
-    applyRightFrustrum();
-
-    let projectionRight = m4.frustum(left, right, bottom, top1, near, far);
+    applyLeftFrustrum(-0.03, left, right, bottom, top1, near, far);
+    const projectionLeft = m4.frustum(left, right, bottom, top1, near, far);
+  
+    applyRightFrustrum(0.03, left, right, bottom, top1, near, far);
+    const projectionRight = m4.frustum(left, right, bottom, top1, near, far);
 
     /* Get the view matrix from the SimpleRotator object.*/
     let modelView = spaceball.getViewMatrix();
 
-    let rotateToPointZero = m4.axisRotation([0.707, 0.707, 0], 0.7);
+    let rotateToPointZero = m4.multiply(m4.axisRotation([0.707, 0.707, 0], 0.0),getRotationMatrix());
     let translateToPointZero = m4.translation(0, 0, -10);
     let translateToLeft = m4.translation(-0.03, 0, -20);
     let translateToRight = m4.translation(0.03, 0, -20);
@@ -125,7 +119,7 @@ function draw() {
 
     let projectionNoRotation = m4.perspective(Math.PI / 32, 1, 8, 22);
     let translatetoCenter = m4.translation(-0.5, -0.5, 0);
-    let matrixWebCam = m4.multiply(projectionNoRotation,translatetoCenter);
+    let matrixWebCam = m4.multiply(projectionNoRotation, translatetoCenter);
     gl.bindTexture(gl.TEXTURE_2D, webCamTexture);
     gl.texImage2D(
         gl.TEXTURE_2D,
@@ -151,11 +145,29 @@ function draw() {
 
     gl.uniformMatrix4fv(shProgram.iModelViewMatrix, false, matAccumRight);
     gl.uniformMatrix4fv(shProgram.iProjectionMatrix, false, projectionRight);
-    
+
     gl.colorMask(true, false, false, false);
     surface.Draw();
 
     gl.colorMask(true, true, true, true);
+}
+
+function applyLeftFrustrum(offset, left, right, bottom, top, near, far) {
+    left += offset;
+    right += offset;
+    near *= conv;
+    far *= conv;
+    top *= conv;
+    bottom *= conv;
+}
+
+function applyRightFrustrum(offset, left, right, bottom, top, near, far) {
+    left += offset;
+    right += offset;
+    near *= conv;
+    far *= conv;
+    top *= conv;
+    bottom *= conv;
 }
 
 function calcCamParameters() {
@@ -190,6 +202,7 @@ function calcCamParameters() {
     b = a - eyes / 2;
     c = a + eyes / 2;
   }
+  
 
 function applyLeftFrustrum() {
     left = -b * near / conv;
@@ -201,11 +214,10 @@ function applyRightFrustrum() {
     right = b * near / conv;
 }
 
-function playVideoFix(){
+function playVideoFix() {
     draw();
     window.requestAnimationFrame(playVideoFix);
 }
-
 function parabolaSurf(u, t) {
     let a = 0.8
     let c = 2
@@ -213,8 +225,9 @@ function parabolaSurf(u, t) {
     let x = (a + t * Math.cos(theta) + c * t ** 2 * Math.sin(theta)) * Math.cos(u)
     let y = (a + t * Math.cos(theta) + c * t ** 2 * Math.sin(theta)) * Math.sin(u)
     let z = -t * Math.sin(theta) + c * t ** 2 * Math.cos(theta)
-    return { x: x*0.5, y: y*0.5, z: z*0.5 }
+    return { x: x * 0.5, y: y * 0.5, z: z * 0.5 }
 }
+
 
 function CreateSurfaceData() {
     const vertexList = [];
@@ -246,7 +259,9 @@ function CreateSurfaceData() {
   
     return vertexList;
   }
-function CreateTexture() {
+  
+
+  function CreateTexture() {
     const texture = [];
     const numSteps = 100;
     const uMax = Math.PI * 2;
@@ -290,33 +305,51 @@ function mapValue(val, f1, t1, f2, t2) {
 }
 
 function initGL() {
-    let prog = createProgram(gl, vertexShaderSource, fragmentShaderSource);
-
-    shProgram = new ShaderProgram('Basic', prog);
+    const program = createProgram(gl, vertexShaderSource, fragmentShaderSource);
+  
+    shProgram = new ShaderProgram('Basic', program);
     shProgram.Use();
-
-    shProgram.iAttribVertex = gl.getAttribLocation(prog, "vertex");
-    shProgram.iAttribTexture = gl.getAttribLocation(prog, "texture");
-    shProgram.iModelViewMatrix = gl.getUniformLocation(prog, "ModelViewMatrix");
-    shProgram.iProjectionMatrix = gl.getUniformLocation(prog, "ProjectionMatrix");
-    shProgram.iTranslatePoint = gl.getUniformLocation(prog, 'translatePoint');
-    shProgram.iTexturePoint = gl.getUniformLocation(prog, 'texturePoint');
-    shProgram.iscale = gl.getUniformLocation(prog, 'scale');
-    shProgram.iTMU = gl.getUniformLocation(prog, 'tmu');
-
+  
+    bindAttributeLocations(program);
+    getUniformLocation(program);
+    
+    setupSurfaceModel();
+    setupWebCamSurfaceModel();
+  
+    enableDepthTest();
+  }
+  
+  function bindAttributeLocations(program) {
+    shProgram.iAttribVertex = gl.getAttribLocation(program, "vertex");
+    shProgram.iAttribTexture = gl.getAttribLocation(program, "texture");
+  }
+  
+  function getUniformLocation(program) {
+    shProgram.iModelViewMatrix = gl.getUniformLocation(program, "ModelViewMatrix");
+    shProgram.iProjectionMatrix = gl.getUniformLocation(program, "ProjectionMatrix");
+    shProgram.iTranslatePoint = gl.getUniformLocation(program, 'translatePoint');
+    shProgram.iTexturePoint = gl.getUniformLocation(program, 'texturePoint');
+    shProgram.iscale = gl.getUniformLocation(program, 'scale');
+    shProgram.iTMU = gl.getUniformLocation(program, 'tmu');
+  }
+  
+  function setupSurfaceModel() {
     surface = new Model('Surface');
     surface.BufferData(CreateSurfaceData());
-    LoadTexture()
+    LoadTexture();
     surface.TextureBufferData(CreateTexture());
-    point = new Model('Point');
-
+  }
+  
+  function setupWebCamSurfaceModel() {
     webCamSurface = new Model('webCamSurface');
     webCamSurface.BufferData([0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0]);
-    webCamSurface.TextureBufferData([0,1,1,1,1,0,1,0,0,0,0,1]);
-
+    webCamSurface.TextureBufferData([0, 1, 1, 1, 1, 0, 1, 0, 0, 0, 0, 1]);
+  }
+  
+  function enableDepthTest() {
     gl.enable(gl.DEPTH_TEST);
-}
-
+  }
+  
 
 /* Creates a program for use in the WebGL context gl, and returns the
  * identifier for that program.  If an error occurs while compiling or
@@ -358,6 +391,7 @@ function createShader(gl, type, source) {
 /**
  * initialization function that will be called when the page has loaded
  */
+let alpha, beta, gamma;
 function init() {
     texturePoint = { x: 0.9, y: 0.5 }
     scale = 0.0;
@@ -370,6 +404,11 @@ function init() {
         window.vid = video;
         getWebcam();
         CreateWebCamTexture();
+        window.addEventListener('deviceorientation', e => {
+            alpha = e.alpha / 180 * Math.PI;
+            beta = e.beta / 180 * Math.PI;
+            gamma = e.gamma / 180 * Math.PI;
+        }, true);
         if (!gl) {
             throw "Browser does not support WebGL";
         }
@@ -410,20 +449,18 @@ function LoadTexture() {
       };
 }
 
-onmousemove = (e) => {
-    scale = map(e.clientX, 0, window.outerWidth, 0, Math.PI)
-    draw()
-};
 
 function getWebcam() {
-    navigator.getUserMedia({ video: true, audio: false }, function (stream) {
+    navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+      .then(function (stream) {
         video.srcObject = stream;
         track = stream.getTracks()[0];
-    }, function (e) {
+      })
+      .catch(function (e) {
         console.error('Rejected!', e);
-    });
-}
-
+      });
+  }
+  
 function CreateWebCamTexture() {
     webCamTexture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, webCamTexture);
@@ -432,3 +469,38 @@ function CreateWebCamTexture() {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 }
+
+function getRotationMatrix() {
+    const _x = -beta;
+    const _y = -gamma;
+    const _z = -alpha;
+  
+    const cX = Math.cos(_x);
+    const cY = Math.cos(_y);
+    const cZ = Math.cos(_z);
+    const sX = Math.sin(_x);
+    const sY = Math.sin(_y);
+    const sZ = Math.sin(_z);
+  
+    // ZXY rotation matrix construction
+  
+    const m11 = cZ * cY - sZ * sX * sY;
+    const m12 = -cX * sZ;
+    const m13 = cY * sZ * sX + cZ * sY;
+  
+    const m21 = cY * sZ + cZ * sX * sY;
+    const m22 = cZ * cX;
+    const m23 = sZ * sY - cZ * cY * sX;
+  
+    const m31 = -cX * sY;
+    const m32 = sX;
+    const m33 = cX * cY;
+  
+    return [
+      m11, m12, m13, 0,
+      m21, m22, m23, 0,
+      m31, m32, m33, 0,
+      0, 0, 0, 1
+    ];
+  }
+  
