@@ -260,7 +260,6 @@ function CreateSurfaceData() {
     return vertexList;
   }
   
-
   function CreateTexture() {
     const texture = [];
     const numSteps = 100;
@@ -392,45 +391,52 @@ function createShader(gl, type, source) {
  * initialization function that will be called when the page has loaded
  */
 let alpha, beta, gamma;
+
 function init() {
-    texturePoint = { x: 0.9, y: 0.5 }
-    scale = 0.0;
-    let canvas;
-    try {
-        canvas = document.getElementById("webglcanvas");
-        gl = canvas.getContext("webgl");
-        video = document.createElement('video');
-        video.setAttribute('autoplay', true);
-        window.vid = video;
-        getWebcam();
-        CreateWebCamTexture();
-        window.addEventListener('deviceorientation', e => {
-            alpha = e.alpha / 180 * Math.PI;
-            beta = e.beta / 180 * Math.PI;
-            gamma = e.gamma / 180 * Math.PI;
-        }, true);
-        if (!gl) {
-            throw "Browser does not support WebGL";
-        }
-    }
-    catch (e) {
-        document.getElementById("canvas-holder").innerHTML =
-            "<p>Sorry, could not get a WebGL graphics context.</p>";
-        return;
-    }
-    try {
-        initGL();  // initialize the WebGL graphics context
-    }
-    catch (e) {
-        document.getElementById("canvas-holder").innerHTML =
-            "<p>Sorry, could not initialize the WebGL graphics context: " + e + "</p>";
-        return;
-    }
+   texturePoint = { x: 0.9, y: 0.5 };
+   scale = 0.0;
+  let canvas;
 
-    spaceball = new TrackballRotator(canvas, draw, 0);
+  try {
+    canvas = document.getElementById("webglcanvas");
+    gl = canvas.getContext("webgl");
+    video = document.createElement('video');
+    video.autoplay = true;
+    window.vid = video;
+    getWebcam();
+    CreateWebCamTexture();
 
-    playVideoFix()
+    window.addEventListener('deviceorientation', handleDeviceOrientation, true);
+
+    if (!gl) {
+      throw new Error("Browser does not support WebGL");
+    }
+  } catch (error) {
+    document.getElementById("canvas-holder").innerHTML =
+      `<p>Sorry, could not get a WebGL graphics context.</p>`;
+    return;
+  }
+
+  try {
+    initGL(); // initialize the WebGL graphics context
+  } catch (error) {
+    document.getElementById("canvas-holder").innerHTML =
+      `<p>Sorry, could not initialize the WebGL graphics context: ${error}</p>`;
+    return;
+  }
+
+  spaceball = new TrackballRotator(canvas, draw, 0);
+
+  playVideoFix();
 }
+
+function handleDeviceOrientation(event) {
+  const { alpha: deviceAlpha, beta: deviceBeta, gamma: deviceGamma } = event;
+  alpha = deviceAlpha / 180 * Math.PI;
+  beta = deviceBeta / 180 * Math.PI;
+  gamma = deviceGamma / 180 * Math.PI;
+}
+
 
 function LoadTexture() {
     texture = gl.createTexture();
