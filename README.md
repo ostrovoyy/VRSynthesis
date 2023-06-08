@@ -2,7 +2,7 @@
 # Photo examples
 
 ![](https://github.com/ostrovoyy/VRSynthesis/blob/main/sample2.jpg)
-![](https://github.com/ostrovoyy/VRSynthesis/blob/main/image.png)
+![](https://github.com/ostrovoyy/VRSynthesis/blob/CGW/image.png)
 
 # There is report on this Calculation&graphics work
 
