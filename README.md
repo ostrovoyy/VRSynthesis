@@ -5,6 +5,8 @@
 
 # Photo of me wearing anaglyphic glasses
 
+![](https://github.com/ostrovoyy/VRSynthesis/blob/PA1/glasses.jpg)
+
 # Photo of UI
 
 ![](https://github.com/ostrovoyy/VRSynthesis/blob/PA1/image.png)
